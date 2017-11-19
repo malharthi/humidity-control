@@ -98,7 +98,9 @@ def readConfig():
     lines = [line.strip() for line in lines]
 
     for line in lines:
-        if line[0] == '#': continue
+        # If line is empty or it is not empty but is comment, ignore
+        if not line or (line and line[0] == '#'): continue
+        
         parts = line.split('=')
         if len(parts) != 2:
             logging.error('Malformed line in humidity_control.config. Ignored. Line: %s', line)
@@ -125,6 +127,7 @@ def main():
     elif -30 <= outdoorTemp < -24: goalRH -= 20
     else: goalRH -= 25
     print goalRH
+    return
 
     logging.basicConfig(filename='humidity_control.log', 
         level=logging.DEBUG,
