@@ -53,7 +53,7 @@ def controlRH(config):
 
     # Try to grab a sensor reading. Use the read_retry method which will retry up
     # to 15 times to get a sensor reading (waiting 2 seconds between each retry).
-    sensor, pin = 'AM2302', 4
+    sensor, pin = Adafruit_DHT.AM2302, 4
     humidity, temperature = Adafruit_DHT.read_retry(sensor, pin)
     if humidity is None or temperature is  None:
         logging.info('Could not read humidity/temperature from the sensor. Waiting to the next round.')
