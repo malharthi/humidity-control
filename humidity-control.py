@@ -8,7 +8,7 @@ import logging
 import StringIO
 import Adafruit_DHT
 from HTMLParser import HTMLParser
-from tplink_smartpluglib import discoverPlugs, SmartPlug
+from tplink_smartplug import discoverPlugs, SmartPlug
 
 def fetchOutdoorTemp():
     atomfeed = 'https://weather.gc.ca/rss/city/on-69_e.xml'
