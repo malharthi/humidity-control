@@ -34,29 +34,31 @@ def findIndoorRelativeHumidity(outdoorTemp, indoorRH):
     return 0
 
 def controlRH(config):
-    plugalias = config['plug_name']
+    aliasToFind = config['plug_name']
     RH_adjustment = config['RH_adjustment']
     
     humidifierPlug = None
     for ip, plug in discoverPlugs().iteritems():
-        if plug.alias().lower() == plugalias.lower():
+        alias = plug.alias()
+        if alias.lower() == aliasToFind.lower():
             humidifierPlug = plug
-            logging.info('Found plug %s.', humidifierPlug)
+            logging.info('Found plug %s with IP: %s', alias, ip)
             break
 
     if not humidifierPlug:
-        logging.error('Could not find the plug \'%s\'. Waiting until the next round.', plugalias)
+        logging.error('Could not find the plug \'%s\'. Waiting until the next round.', aliasToFind)
         return
 
     outdoorTemp = fetchOutdoorTemp()
 
     # Try to grab a sensor reading. Use the read_retry method which will retry up
     # to 15 times to get a sensor reading (waiting 2 seconds between each retry).
-    sensor, pin = 2302, 4
+    sensor, pin = 'AM2302', 4
     humidity, temperature = Adafruit_DHT.read_retry(sensor, pin)
     if humidity is None or temperature is  None:
         logging.info('Could not read humidity/temperature from the sensor. Waiting to the next round.')
         return
+    humidity += RH_adjustment
 
     goalRH = config['max_RH']
     if outdoorTemp >= 0: goalRH = goalRH
