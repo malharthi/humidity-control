@@ -41,6 +41,7 @@ def controlRH(config):
     for ip, plug in discoverPlugs().iteritems():
         if plug.alias().lower() == plugalias.lower():
             humidifierPlug = plug
+            logging.info('Found plug %s.', humidifierPlug)
             break
 
     if not humidifierPlug:
