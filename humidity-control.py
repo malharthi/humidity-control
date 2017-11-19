@@ -76,9 +76,8 @@ def controlRH(config):
     logging.info('Outdoor temp: %f °C, Indoor temp: %f °C, Indoor RH: %f %% ', outdoorTemp, temperature, humidity)
     logging.info('Humidifier action: turn %s, Success: %s', action, success)
     
-
-
 def loop(config):
+    logging.info('Starting control cycles.')
     interval = config['interval']
     while True:
         controlRH(config)
@@ -100,7 +99,7 @@ def readConfig():
     for line in lines:
         # If line is empty or it is not empty but is comment, ignore
         if not line or (line and line[0] == '#'): continue
-        
+
         parts = line.split('=')
         if len(parts) != 2:
             logging.error('Malformed line in humidity_control.config. Ignored. Line: %s', line)
@@ -114,21 +113,12 @@ def readConfig():
         except ValueError:
             logging.error('Malformed value in humidity_control.config. Ignored. Line: %s', line)
 
+        print 'Config:'
+        print config
+
         return config
 
 def main():
-
-    goalRH = 40
-    outdoorTemp = 10
-    if outdoorTemp >= 0: goalRH = goalRH
-    elif -12 <= outdoorTemp < 0: goalRH -= 5
-    elif -18 <= outdoorTemp < -12: goalRH -= 10
-    elif -24 <= outdoorTemp < -18: goalRH -= 15
-    elif -30 <= outdoorTemp < -24: goalRH -= 20
-    else: goalRH -= 25
-    print goalRH
-    return
-
     logging.basicConfig(filename='humidity_control.log', 
         level=logging.DEBUG,
         format='%(asctime)s %(message)s')
