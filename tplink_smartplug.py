@@ -64,19 +64,20 @@ class SmartPlug(object):
     
     def _sendCommand(self, cmd):
         """Send a command and receive the response."""
-        reponse = None
+        response = None
         try:
             sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock_tcp.connect((self.ip, SMARTPLUG_PORT))
-            sock_tcp.send(encrypt(cmd))
-            data = sock_tcp.recv(2048)
+            encryptedCmd = encrypt(cmd)
+            sock_tcp.send(encryptedCmd)
+            data = sock_tcp.recv(4096)
             sock_tcp.close()
             
             response = decrypt(data[4:])
         except socket.error as e:
             logging.error('_sendCommand error. socket.error: %s', e)
 
-        return reponse
+        return response
 
     def turnOn(self):
         return self._processOnOffResponse(self._sendCommand(commands['on']))
@@ -85,10 +86,13 @@ class SmartPlug(object):
         return self._processOnOffResponse(self._sendCommand(commands['off']))
 
     def _processOnOffResponse(self, response):
-        info = json.loads(response)
-        if "system" in info and "set_relay_state" in info["system"]:
-            relayState = info["system"]["set_relay_state"]
-            return relayState['err_code'] == 0
+        if response:
+            info = json.loads(response)
+            if "system" in info and "set_relay_state" in info["system"]:
+                relayState = info["system"]["set_relay_state"]
+                return relayState['err_code'] == 0
+            else:
+                return False
         else:
             return False
 
@@ -131,3 +135,20 @@ def discoverPlugs(timeout=3):
     return devices
 
     
+def discoveryTest():
+    """Testing of smart plug discovery and messeging."""
+    aliasToFind = 'HumidifierOutlet'
+    humidifierPlug = None
+    for ip, plug in discoverPlugs().iteritems():
+        alias = plug.alias()
+        if alias.lower() == aliasToFind.lower():
+            humidifierPlug = plug
+            logging.info('Found plug %s with IP: %s', alias, ip)
+            break
+
+    if not humidifierPlug:
+        logging.error('Could not find the plug \'%s\'. Waiting until the next round.', aliasToFind)
+        return
+    else:
+        humidifierPlug.turnOn()
+    return

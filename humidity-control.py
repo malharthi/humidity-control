@@ -116,9 +116,7 @@ def readConfig():
         except ValueError:
             logging.error('Malformed value in humidity_control.config. Ignored. Line: %s', line)
 
-    print 'Config:'
-    print config
-
+    logging.info('Config: %s', config)
     return config
 
 def main():
