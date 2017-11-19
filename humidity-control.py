@@ -39,7 +39,7 @@ def controlRH(config):
     RH_adjustment = config['RH_adjustment']
     
     humidifierPlug = None
-    for ip, plug in discoverPlugs():
+    for ip, plug in discoverPlugs().iteritems():
         if plug.alias().lower() == plugalias.lower():
             humidifierPlug = plug
 
