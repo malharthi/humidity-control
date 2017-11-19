@@ -5,7 +5,6 @@ import re
 import feedparser
 import time
 import logging
-import StringIO
 import Adafruit_DHT
 from HTMLParser import HTMLParser
 from tplink_smartplug import discoverPlugs, SmartPlug
@@ -42,9 +41,10 @@ def controlRH(config):
     for ip, plug in discoverPlugs().iteritems():
         if plug.alias().lower() == plugalias.lower():
             humidifierPlug = plug
+            break
 
     if not humidifierPlug:
-        logging.error('Could not find the plug \'%s\'. Waiting until the next round.')
+        logging.error('Could not find the plug \'%s\'. Waiting until the next round.', plugalias)
         return
 
     outdoorTemp = fetchOutdoorTemp()
@@ -94,11 +94,11 @@ def readConfig():
     with open('humidity-control.config') as f:
         lines = f.readlines()
     
-    lines = [line.strip() for line in lines]
+    # lines = [line.strip() for line in lines]
 
     for line in lines:
         # If line is empty or it is not empty but is comment, ignore
-        if not line or (line and line[0] == '#'): continue
+        if line in ['\r\n', '\n'] or (line and line[0] == '#'): continue
 
         parts = line.split('=')
         if len(parts) != 2:
@@ -106,20 +106,20 @@ def readConfig():
             continue
         
         try:
-            key, value = parts[0], parts[1]
+            key, value = parts[0].strip(), parts[1].strip()
             if key == 'plug_name': config[key] = value
             elif key == 'interval': config[key] = int(value)
             elif key == 'RH_adjustment' or key == 'max_RH': config[key] = float(value)
         except ValueError:
             logging.error('Malformed value in humidity_control.config. Ignored. Line: %s', line)
 
-        print 'Config:'
-        print config
+    print 'Config:'
+    print config
 
-        return config
+    return config
 
 def main():
-    logging.basicConfig(filename='humidity_control.log', 
+    logging.basicConfig( # filename='humidity-control.log', 
         level=logging.DEBUG,
         format='%(asctime)s %(message)s')
     loop(readConfig())
