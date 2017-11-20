@@ -54,9 +54,19 @@ def decrypt(string):
         result += chr(a)
     return result
 
+# Serves as an enum of a SmarPlug state. Values are compatible
+# with TP-LINK Smart Plug values of relay_state.
+class PlugState():
+    ON = 1
+    OFF = 0
+    UNKNOWN = -1
+
 class SmartPlug(object):
     """Represnts TP-Link HS100 Smart Plug"""
     
+    State = PlugState
+    _statedict = { State.ON: 'On', State.OFF: 'Off', State.UNKNOWN: 'Unknown' }
+
     def __init__(self, ip, sysinfo):
         self.ip = ip
         self.sysinfo = sysinfo
@@ -84,6 +94,13 @@ class SmartPlug(object):
 
     def turnOff(self):
         return self._processOnOffResponse(self._sendCommand(commands['off']))
+
+    def state(self, str=False):
+        """Returns the state of the plug as an enum value (int) when str is not passed. 
+        To get a tuple such 'ON, 'On' pass str as True.
+        """
+        s = self.sysinfo.get('relay_state', SmartPlug.State.UNKNOWN)
+        return s if not str else (s, SmartPlug._statedict[s])
 
     def _processOnOffResponse(self, response):
         if response:
@@ -147,7 +164,7 @@ def discoveryTest():
             break
 
     if not humidifierPlug:
-        logging.error('Could not find the plug \'%s\'. Waiting until the next round.', aliasToFind)
+        logging.error('Could not find the plug \'%s\'.', aliasToFind)
         return
     else:
         humidifierPlug.turnOn()
