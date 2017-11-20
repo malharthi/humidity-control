@@ -63,7 +63,7 @@ def controlRH(config):
 
     goalRH = config['max_RH']
     roundedOutdoorTtemp = round(outdoorTemp)
-    if roundedOutdoorTtemp >= 0: goalRH = goalRH
+    if roundedOutdoorTtemp >= 0: goalRH -= 2 # Keep it a bit below the max for safety
     elif -12 <= roundedOutdoorTtemp < 0: goalRH -= 5
     elif -18 <= roundedOutdoorTtemp < -12: goalRH -= 10
     elif -24 <= roundedOutdoorTtemp < -18: goalRH -= 15
@@ -71,14 +71,15 @@ def controlRH(config):
     else: goalRH -= 25
 
     action = None
+    humidifierState = humidifierPlug.state()
     if round(humidity) >= goalRH:
-        if humidifierPlug.state() == SmartPlug.State.OFF:
+        if humidifierState == SmartPlug.State.OFF:
             action = 'Keep off'
         else:
             success = humidifierPlug.turnOff()
             action = 'Turn off, ' + 'Succeeded' if success else 'Failed'
     else:
-        if humidifierPlug.state() == SmartPlug.State.ON:
+        if humidifierState == SmartPlug.State.ON:
             action = 'Keep on'
         else:
             success = humidifierPlug.turnOn()
