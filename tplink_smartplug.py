@@ -65,7 +65,9 @@ class SmartPlug(object):
     """Represnts TP-Link HS100 Smart Plug"""
     
     State = PlugState
-    _statedict = { State.ON: 'On', State.OFF: 'Off', State.UNKNOWN: 'Unknown' }
+    _statedict = { State.ON: 'On', 
+                   State.OFF: 'Off', 
+                   State.UNKNOWN: 'Unknown' }
 
     def __init__(self, ip, sysinfo):
         self.ip = ip
@@ -90,19 +92,22 @@ class SmartPlug(object):
         return response
 
     def turnOn(self):
+        """Turns the plug on, and returns the success state (True/False)"""
         return self._processOnOffResponse(self._sendCommand(commands['on']))
 
     def turnOff(self):
+        """Turns the plug off, and returns the success state (True/False)"""
         return self._processOnOffResponse(self._sendCommand(commands['off']))
 
     def state(self, str=False):
         """Returns the state of the plug as an enum value (int) when str is not passed. 
-        To get a tuple such 'ON, 'On' pass str as True.
+        To get a tuple with a string value like ('ON, 'On'), pass str as True.
         """
         s = self.sysinfo.get('relay_state', SmartPlug.State.UNKNOWN)
         return s if not str else (s, SmartPlug._statedict[s])
 
     def _processOnOffResponse(self, response):
+        """Helper for turnOn/turnOff"""
         if response:
             info = json.loads(response)
             if "system" in info and "set_relay_state" in info["system"]:
@@ -151,7 +156,7 @@ def discoverPlugs(timeout=3):
 
     return devices
 
-    
+# This is called in test routines only.
 def discoveryTest():
     """Testing of smart plug discovery and messeging."""
     aliasToFind = 'HumidifierOutlet'

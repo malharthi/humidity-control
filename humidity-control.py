@@ -1,39 +1,46 @@
 # -*- coding: utf-8 -*-
 
-import sys
 import re
-import feedparser
 import time
+import socket
 import logging
-import Adafruit_DHT
 from HTMLParser import HTMLParser
+
+import feedparser
+import Adafruit_DHT
+
 from tplink_smartplug import discoverPlugs, SmartPlug
+
+lastKnownOutdoorTemp = None
+outdoorTempLastUpdate = None
 
 def fetchOutdoorTemp():
     atomfeed = 'https://weather.gc.ca/rss/city/on-69_e.xml'
+
+    socket.setdefaulttimeout(5)
     feeddata = feedparser.parse(atomfeed)
     if not feeddata.entries:
         logging.error('Failed to retreive outdoor weather feed.')
         return None
-
-    summary = HTMLParser().unescape(feeddata.entries[1].summary)
+    
+    # The 'Current Conditions' entry we are after
+    entry = feeddata.entries[1]
+    summary = HTMLParser().unescape(entry.summary)
     for line in summary.splitlines():
         if 'Temperature' in line:
             result = re.findall(r"[-+]?\d*\.\d+|\d+", line)
             if not result:
-                logging.error('Failed to parse outdoor temerature.')
+                logging.error('Failed to parse outdoor temperature.')
                 return None
             else:
+                # published = entry.published_parsed if not None else 
                 return float(result[0])
 
-def readIndoorHumidityTemp():
-    """Returns a temperature, humidity tupple as read from the sensor."""
-    return 0, 0
+    # We should not arrive here, but if we are, then..
+    logging.error('No temperature value was found in the feed. The format might have changed.')
+    return None
 
-def findIndoorRelativeHumidity(outdoorTemp, indoorRH):
-    return 0
-
-def controlRH(config):
+def controlcycle(config):
     aliasToFind = config['plug_name']
     RH_adjustment = config['RH_adjustment']
     
@@ -50,14 +57,29 @@ def controlRH(config):
         logging.error('Could not find the plug \'%s\'. Waiting until the next round.', aliasToFind)
         return
 
+    # Fetch outdoor temperature from weather service and set as the last known temp. 
+    # If failed, use the last known reading. If also not available, use the 
+    # fallback value from config.
+
+    # if (outdoorTempLastUpdate is not None) and (utdoorTempLastUpdate >= (60*15)):
     outdoorTemp = fetchOutdoorTemp()
+    if outdoorTemp is not None:
+        lastKnownOutdoorTemp = outdoorTemp
+        controloutdoorTempLastUpdate = time.time()
+    else:
+        if lastKnownOutdoorTemp is not None:
+            outdoorTemp = lastKnownOutdoorTemp
+        else:
+            fallbackTemp = config['fallback_temp']
+            logging.info('No available new outdoor temp reading. Assuming %0.1f°C', fallbackTemp)
+            outdoorTemp = fallbackTemp
 
     # Try to grab a sensor reading. Use the read_retry method which will retry up
     # to 15 times to get a sensor reading (waiting 2 seconds between each retry).
     sensor, pin = Adafruit_DHT.AM2302, 4
     humidity, temperature = Adafruit_DHT.read_retry(sensor, pin)
     if humidity is None or temperature is None:
-        logging.error('Could not read humidity/temperature from the sensor. Waiting to the next round.')
+        logging.error('Could not read humidity/temperature from the sensor. Waiting until the next round.')
         return
     humidity += RH_adjustment
 
@@ -85,7 +107,7 @@ def controlRH(config):
             success = humidifierPlug.turnOn()
             action = 'Turn on, ' + 'Succeeded' if success else 'Failed'
 
-    logging.info('Outdoor temp: %3.2f °C, Indoor temp: %3.2f °C, Goal RH: %2.0f %%, Indoor RH: %2.1f %%', 
+    logging.info('Outdoor temp: %0.1f°C, Indoor temp: %0.1f°C, Goal RH: %0.0f%%, Indoor RH: %0.1f%%', 
                  outdoorTemp, temperature, goalRH, humidity)
     logging.info('Action: %s', action)
     
@@ -93,7 +115,7 @@ def loop(config):
     interval = config['interval']
     logging.info('Starting the control loop with a %d minute interval', interval)
     while True:
-        controlRH(config)
+        controlcycle(config)
         time.sleep(interval * 60)
 
 def readConfig():
@@ -101,11 +123,16 @@ def readConfig():
     config = {'plug_name': 'My Smart Plug',
               'interval': 5,
               'RH_adjustment': 0,
-              'max_RH': 35
+              'max_RH': 35,
+              'fallback_temp': -1
               }
 
-    with open('humidity-control.config') as f:
-        lines = f.readlines()
+    try:
+        with open('humidity-control.config') as f:
+            lines = f.readlines()
+    except IOError as e:
+        logging.error('Could not load the config file. Using a default configuration. Error: %s', e)
+        return config
 
     for line in lines:
         # If line is empty or it is not empty but is comment, ignore
@@ -120,7 +147,8 @@ def readConfig():
             key, value = parts[0].strip(), parts[1].strip()
             if key == 'plug_name': config[key] = value
             elif key == 'interval': config[key] = int(value)
-            elif key in ['RH_adjustment', 'max_RH']: config[key] = float(value)
+            elif key in ['RH_adjustment', 'max_RH', 'fallback_temp']: 
+                config[key] = float(value)
         except ValueError:
             logging.error('Malformed value in humidity_control.config. Ignored. Line: %s', line)
 
@@ -128,7 +156,7 @@ def readConfig():
     return config
 
 def main():
-    logging.basicConfig( # filename='humidity-control.log', 
+    logging.basicConfig(#filename='humidity-control.log', 
         level=logging.DEBUG,
         format='%(asctime)s %(levelname)s: %(message)s',
         datefmt='%b %d %H:%M:%S')
