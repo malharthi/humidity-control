@@ -4,13 +4,15 @@ After=multi-user.target network.target
 
 [Service]
 Type=idle
+WorkingDirectory=/home/pi/humidity-control
 ExecStart=/usr/bin/python /home/pi/humidity-control/humidity-control.py
 
 # Connects standard output to /dev/null
  StandardOutput=null
 
 # Connects standard error to journal
-StandardError=journal
+# StandardError=null
+
 Restart=on-failure
 
 [Install]

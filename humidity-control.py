@@ -11,12 +11,16 @@ import Adafruit_DHT
 
 from tplink_smartplug import discoverPlugs, SmartPlug
 
-lastKnownOutdoorTemp = None
-outdoorTempLastUpdate = None
+
+class Context(object):
+    def __init__(self):
+        self.config = None
+        self.lastKnownOutdoorTemp = None
+        self.outdoorTempLastUpdate = None
+
 
 def fetchOutdoorTemp():
     atomfeed = 'https://weather.gc.ca/rss/city/on-69_e.xml'
-
     socket.setdefaulttimeout(5)
     feeddata = feedparser.parse(atomfeed)
     if not feeddata.entries:
@@ -32,17 +36,16 @@ def fetchOutdoorTemp():
             if not result:
                 logging.error('Failed to parse outdoor temperature.')
                 return None
-            else:
-                # published = entry.published_parsed if not None else 
-                return float(result[0])
+            # published = entry.published_parsed if not None else 
+            return float(result[0])
 
     # We should not arrive here, but if we are, then..
     logging.error('No temperature value was found in the feed. The format might have changed.')
     return None
 
-def controlcycle(config):
-    aliasToFind = config['plug_name']
-    RH_adjustment = config['RH_adjustment']
+def controlcycle(context):
+    aliasToFind = context.config['plug_name']
+    RH_adjustment = context.config['RH_adjustment']
     
     humidifierPlug = None
     for ip, plug in discoverPlugs().iteritems():
@@ -61,17 +64,16 @@ def controlcycle(config):
     # If failed, use the last known reading. If also not available, use the 
     # fallback value from config.
 
-    # if (outdoorTempLastUpdate is not None) and (utdoorTempLastUpdate >= (60*15)):
     outdoorTemp = fetchOutdoorTemp()
     if outdoorTemp is not None:
-        lastKnownOutdoorTemp = outdoorTemp
-        controloutdoorTempLastUpdate = time.time()
+        context.lastKnownOutdoorTemp = outdoorTemp
+        context.outdoorTempLastUpdate = time.time()
     else:
-        if lastKnownOutdoorTemp is not None:
-            outdoorTemp = lastKnownOutdoorTemp
+        if context.lastKnownOutdoorTemp is not None:
+            outdoorTemp = context.lastKnownOutdoorTemp
         else:
-            fallbackTemp = config['fallback_temp']
-            logging.info('No available new outdoor temp reading. Assuming %0.1f°C', fallbackTemp)
+            fallbackTemp = context.config['fallback_temp']
+            logging.info('No available outdoor temp reading. Assuming %0.1f°C', fallbackTemp)
             outdoorTemp = fallbackTemp
 
     # Try to grab a sensor reading. Use the read_retry method which will retry up
@@ -83,7 +85,7 @@ def controlcycle(config):
         return
     humidity += RH_adjustment
 
-    goalRH = config['max_RH']
+    goalRH = context.config['max_RH']
     roundedOutdoorTtemp = round(outdoorTemp)
     if roundedOutdoorTtemp >= 0: goalRH -= 2 # Keep it a bit below the max for safety
     elif -12 <= roundedOutdoorTtemp < 0: goalRH -= 5
@@ -107,15 +109,15 @@ def controlcycle(config):
             success = humidifierPlug.turnOn()
             action = 'Turn on, ' + 'Succeeded' if success else 'Failed'
 
-    logging.info('Outdoor temp: %0.1f°C, Indoor temp: %0.1f°C, Goal RH: %0.0f%%, Indoor RH: %0.1f%%', 
+    logging.info('Outdoor temp: %0.1f°C, Indoor temp: %0.1f°C, Target RH: %0.0f%%, Indoor RH: %0.1f%%', 
                  outdoorTemp, temperature, goalRH, humidity)
     logging.info('Action: %s', action)
     
-def loop(config):
-    interval = config['interval']
+def loop(context):
+    interval = context.config['interval']
     logging.info('Starting the control loop with a %d minute interval', interval)
     while True:
-        controlcycle(config)
+        controlcycle(context)
         time.sleep(interval * 60)
 
 def readConfig():
@@ -125,7 +127,7 @@ def readConfig():
               'RH_adjustment': 0,
               'max_RH': 35,
               'fallback_temp': -1
-              }
+             }
 
     try:
         with open('humidity-control.config') as f:
@@ -152,7 +154,6 @@ def readConfig():
         except ValueError:
             logging.error('Malformed value in humidity_control.config. Ignored. Line: %s', line)
 
-    logging.info('Config: %s', config)
     return config
 
 def main():
@@ -160,7 +161,16 @@ def main():
         level=logging.DEBUG,
         format='%(asctime)s %(levelname)s: %(message)s',
         datefmt='%b %d %H:%M:%S')
-    loop(readConfig())
+        
+    from logging.handlers import RotatingFileHandler
+    handler = logging.handlers.RotatingFileHandler('humidity-control.log',
+                                                   maxBytes=500000, backupCount=100)
+    logging.getLogger('').addHandler(handler)
+    
+    context = Context()
+    context.config = readConfig()
+    logging.info('Config: %s', context.config)
+    loop(context)
 
 if __name__ == "__main__":
     main()
