@@ -162,6 +162,7 @@ def main():
         format='%(asctime)s %(levelname)s: %(message)s',
         datefmt='%b %d %H:%M:%S')
 
+    from logging.handlers import RotatingFileHandler
     handler = logging.handlers.RotatingFileHandler('humidity-control.log',
                                                    maxBytes=500000, backupCount=100)
     logging.getLogger('').addHandler(handler)
