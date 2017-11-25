@@ -157,16 +157,24 @@ def readConfig():
     return config
 
 def main():
-    logging.basicConfig(#filename='humidity-control.log', 
-        level=logging.DEBUG,
-        format='%(asctime)s %(levelname)s: %(message)s',
-        datefmt='%b %d %H:%M:%S')
+    # logging.basicConfig(#filename='humidity-control.log', 
+    #     level=logging.DEBUG,
+    #     format='%(asctime)s %(levelname)s: %(message)s',
+    #     datefmt='%b %d %H:%M:%S')
+
+    
+    formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s', 
+                                  datefmt='%b %d %H:%M:%S')
 
     from logging.handlers import RotatingFileHandler
     handler = logging.handlers.RotatingFileHandler('humidity-control.log',
                                                    maxBytes=500000, backupCount=100)
-    logging.getLogger('').addHandler(handler)
+    handler.setFormatter(formatter)
     
+    logger = logging.getLogger('')
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
     context = Context()
     context.config = readConfig()
     logging.info('Config: %s', context.config)
