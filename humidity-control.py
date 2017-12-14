@@ -169,7 +169,7 @@ def main():
     formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s', 
                                   datefmt='%b %d %H:%M:%S')
 
-    # from logging.handlers import RotatingFileHandler
+    from logging.handlers import RotatingFileHandler
     handler = logging.handlers.RotatingFileHandler('humidity-control.log',
                                                    maxBytes=500000, backupCount=100)
     handler.setFormatter(formatter)
