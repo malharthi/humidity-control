@@ -64,17 +64,18 @@ def controlcycle(context):
     # If failed, use the last known reading. If also not available, use the 
     # fallback value from config.
 
-    outdoorTemp = fetchOutdoorTemp()
-    if outdoorTemp is not None:
-        context.lastKnownOutdoorTemp = outdoorTemp
-        context.outdoorTempLastUpdate = time.time()
-    else:
-        if context.lastKnownOutdoorTemp is not None:
-            outdoorTemp = context.lastKnownOutdoorTemp
+    if RH_adjustment:
+        outdoorTemp = fetchOutdoorTemp()
+        if outdoorTemp is not None:
+            context.lastKnownOutdoorTemp = outdoorTemp
+            context.outdoorTempLastUpdate = time.time()
         else:
-            fallbackTemp = context.config['fallback_temp']
-            logging.info('No available outdoor temp reading. Assuming %0.1f°C', fallbackTemp)
-            outdoorTemp = fallbackTemp
+            if context.lastKnownOutdoorTemp is not None:
+                outdoorTemp = context.lastKnownOutdoorTemp
+            else:
+                fallbackTemp = context.config['fallback_temp']
+                logging.info('No available outdoor temp reading. Assuming %0.1f°C', fallbackTemp)
+                outdoorTemp = fallbackTemp
 
     # Try to grab a sensor reading. Use the read_retry method which will retry up
     # to 15 times to get a sensor reading (waiting 2 seconds between each retry).
@@ -83,16 +84,15 @@ def controlcycle(context):
     if humidity is None or temperature is None:
         logging.error('Could not read humidity/temperature from the sensor. Waiting until the next round.')
         return
-    humidity += RH_adjustment
-
+    
     goalRH = context.config['max_RH']
-    roundedOutdoorTtemp = round(outdoorTemp)
-    if roundedOutdoorTtemp >= 0: goalRH -= 2 # Keep it a bit below the max for safety
-    elif -12 <= roundedOutdoorTtemp < 0: goalRH -= 5
-    elif -18 <= roundedOutdoorTtemp < -12: goalRH -= 10
-    elif -24 <= roundedOutdoorTtemp < -18: goalRH -= 15
-    elif -30 <= roundedOutdoorTtemp < -24: goalRH -= 20
-    else: goalRH -= 25
+    if RH_adjustment:
+        roundedOutdoorTtemp = round(outdoorTemp)
+        if -12 <= roundedOutdoorTtemp < 0: goalRH -= 5
+        elif -18 <= roundedOutdoorTtemp < -12: goalRH -= 10
+        elif -24 <= roundedOutdoorTtemp < -18: goalRH -= 15
+        elif -30 <= roundedOutdoorTtemp < -24: goalRH -= 20
+        else: goalRH -= 25
 
     action = None
     humidifierState = humidifierPlug.state()
@@ -109,8 +109,9 @@ def controlcycle(context):
             success = humidifierPlug.turnOn()
             action = 'Turn on, ' + 'Succeeded' if success else 'Failed'
 
-    logging.info('Outdoor temp: %0.1f°C, Indoor temp: %0.1f°C, Target RH: %0.0f%%, Indoor RH: %0.1f%%', 
-                 outdoorTemp, temperature, goalRH, humidity)
+    logMsg = ('Outdoor temp: %0.1f°C, ' % outdoorTemp) if RH_adjustment else ''
+    logMsg += 'Indoor temp: %0.1f°C, Target RH: %0.0f%%, Indoor RH: %0.1f%%'
+    logging.info(logMsg, temperature, goalRH, humidity)
     logging.info('Action: %s', action)
     
 def loop(context):
@@ -124,7 +125,7 @@ def readConfig():
     # The default configuration
     config = {'plug_name': 'My Smart Plug',
               'interval': 5,
-              'RH_adjustment': 0,
+              'RH_adjustment': True,
               'max_RH': 35,
               'fallback_temp': -1
              }
@@ -149,8 +150,10 @@ def readConfig():
             key, value = parts[0].strip(), parts[1].strip()
             if key == 'plug_name': config[key] = value
             elif key == 'interval': config[key] = int(value)
-            elif key in ['RH_adjustment', 'max_RH', 'fallback_temp']: 
+            elif key in ['max_RH', 'fallback_temp']: 
                 config[key] = float(value)
+            elif key == 'RH_adjustment':
+                config[key] = True if value.lower() in ['true', 'yes', '1'] else False
         except ValueError:
             logging.error('Malformed value in humidity_control.config. Ignored. Line: %s', line)
 
@@ -166,7 +169,7 @@ def main():
     formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s', 
                                   datefmt='%b %d %H:%M:%S')
 
-    from logging.handlers import RotatingFileHandler
+    # from logging.handlers import RotatingFileHandler
     handler = logging.handlers.RotatingFileHandler('humidity-control.log',
                                                    maxBytes=500000, backupCount=100)
     handler.setFormatter(formatter)
