@@ -88,7 +88,8 @@ def controlcycle(context):
     goalRH = context.config['max_RH']
     if RH_adjustment:
         roundedOutdoorTtemp = round(outdoorTemp)
-        if -12 <= roundedOutdoorTtemp < 0: goalRH -= 5
+        if roundedOutdoorTtemp >= 0: goalRH = goalRH
+        elif -12 <= roundedOutdoorTtemp < 0: goalRH -= 5
         elif -18 <= roundedOutdoorTtemp < -12: goalRH -= 10
         elif -24 <= roundedOutdoorTtemp < -18: goalRH -= 15
         elif -30 <= roundedOutdoorTtemp < -24: goalRH -= 20
